@@ -1,1 +1,1 @@
-### Данный playbook устанавливает Zabbix-server и Zabbix-agent необходимой версии, для редактирования версии zabbix взайдите в папку group_vars и отредартируйте файл all.yaml , перед выполнением Playbook спросит пароль для пользователя zabbix и базы zabbix
+### Данный playbook устанавливает Zabbix-server и Zabbix-agent необходимой версии, для редактирования версии zabbix зайдите в папку group_vars и отредактируйте файл all.yaml , перед выполнением Playbook спросит пароль создать для пользователя zabbix к базе zabbix
