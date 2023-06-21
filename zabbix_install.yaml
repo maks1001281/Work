@@ -1,0 +1,102 @@
+- name: Install Zabbix
+  hosts: 192.168.1.8
+  vars_prompt:
+  - name: pg_password     
+    prompt: "Enter Postgres user password:"
+    private: yes
+  become: yes
+
+  tasks:
+    - name: Install system program
+      apt:
+        pkg:
+        - mc
+        - htop
+        - nano
+        - git
+        - wget
+        - curl
+        - expect
+
+    - name: Download repo zabbix
+      get_url:
+        url: https://repo.zabbix.com/zabbix/{{ version }}/ubuntu/pool/main/z/zabbix-release/{{ release }}
+        dest: /tmp/{{ release }}
+        mode: +x
+
+    - name: Install repo zabbix
+      shell: dpkg -i /tmp/{{ release }}
+
+    - name: Update system
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Install zabbix-server zabbix-agent nginx psql
+      apt:
+        pkg:
+        - zabbix-server-pgsql
+        - zabbix-frontend-php
+        - php8.1-pgsql
+        - zabbix-nginx-conf
+        - zabbix-sql-scripts
+        - zabbix-agent
+        - postgresql
+        - postgresql-contrib
+
+    - name: Create Postgres user
+      expect:
+        command: sudo -u postgres createuser --pwprompt zabbix
+        responses:
+          "Enter password for new role:": "{{ pg_password }}"
+          "Enter it again:": "{{ pg_password }}"
+    
+    - name: Create DB
+      shell: sudo -u postgres createdb -O zabbix zabbix
+
+    - name: Register DB
+      shell: zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | sudo -u zabbix psql zabbix
+
+    - name: Add passwd DB zabbix config
+      lineinfile:
+        path: /etc/zabbix/zabbix_server.conf
+        regexp: '^# DBPassword='
+        line: DBPassword={{ pg_password }}
+      tags: add passwd
+
+    - name: Add config port nginx.conf
+      lineinfile:
+        path: /etc/zabbix/nginx.conf
+        regexp: '^#        listen          8080;'
+        line:              listen          8080;
+      tags: add config
+
+    - name: Add config server name nginx.con
+      lineinfile:
+        path: /etc/zabbix/nginx.conf
+        regexp: '^#        server_name     example.com;'
+        line:              server_name     example.com;
+        firstmatch: yes
+      tags: add config
+
+    - name: Restarted service
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - nginx
+        - php8.1-fpm 
+      tags: restart
+
+    - name: Enable service
+      service:
+        name: "{{ item }}"
+        enabled: yes
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - nginx 
+        - php8.1-fpm
+      tags: enabled
